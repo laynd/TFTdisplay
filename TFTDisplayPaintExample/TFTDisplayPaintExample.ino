@@ -8,9 +8,21 @@ Daniel Lameka 2/12/2016
 
 
 
-#include <SPFD5408_Adafruit_GFX.h>    // Core graphics library
-#include <SPFD5408_Adafruit_TFTLCD.h> // Hardware-specific library
-#include <SPFD5408_TouchScreen.h>
+#include "SPFD5408_Adafruit_GFX.h"    // Core graphics library
+#include "SPFD5408_Adafruit_TFTLCD.h" // Hardware-specific library
+#include "SPFD5408_TouchScreen.h"
+#include "Wire.h"   // for time module lib
+#include "RTClib.h" // time module lib
+#include "PCM.h"
+
+#define DS1307_ADDRESS 0x68
+#define BAUD 9600
+#define ON LOW
+#define OFF HIGH
+#define RELAY 4
+
+byte zero = 0x00; // workaround for issue #52 time module related
+RTC_DS1307 RTC;   // time module related
 
 #if defined(__SAM3X8E__)
     #undef __FlashStringHelper::F(string_literal)
@@ -59,21 +71,48 @@ TouchScreen ts = TouchScreen(XP, YP, XM, YM, 300);
 #define MENUW 105
 #define MENUH 125
 #define BORDER 10
+#define TBUTTON 75
 
 Adafruit_TFTLCD tft(LCD_CS, LCD_CD, LCD_WR, LCD_RD, LCD_RESET);
 
+const unsigned char R2D2[] PROGMEM = {
+80, 78, 152, 189, 133, 70, 91, 167, 185,
+};
 
-int menuSelect;
+int menuSelect = 0;
+int currentHour=0;
+int currentMinute=0;
+int pastMinute=0;
+int x,y, setHour, setMin, alarmHour, alarmMin, shutHour, shutMin;
+
+DateTime now;
+
 
 void setup(void) {
-  Serial.begin(9600);
-  Serial.println(F("Paint!"));
+  Serial.begin(BAUD);
+  Serial.println("Water Pump Controller V 0.1");
+  RTC.begin(); 
+  if (! RTC.isrunning()) {Serial.println("RTC is NOT running!");}
+  //now = RTC.now();
+  //currentHour=now.hour();
+  //currentMinute=now.minute();
+
+  setHour = 0;
+  setMin = 0;
+  alarmHour = 0;
+  alarmMin = 0;
+  shutHour = 0;
+  shutMin = 0;
+
+  currentHour=1;
+  currentMinute=27;
+  pastMinute=currentMinute;
   
+   //startPlayback(R2D2, sizeof(R2D2)); //connect speaker positive wire to pin 11 and negative to ground 
+  // to stop use stopPlayback(); function
   tft.reset();
   tft.begin(0x9341); // SDFP5408
   tft.setRotation(0); // Need for the Mega, please changed for your choice or rotation initial
-
-  // Border
 
   drawBorder();
   
@@ -96,11 +135,17 @@ void setup(void) {
   // Wait touch
   waitOneTouch();
   tft.fillScreen(DARKGREY);
+  
 
-  statusBar();
+  statusBar(currentHour, currentMinute);
   drawMenu();
   pinMode(13, OUTPUT);
+
+  x=0;
+  y=0;
 }
+
+
 
 
 
@@ -109,23 +154,35 @@ void loop()
   digitalWrite(13, HIGH);
   TSPoint p = ts.getPoint();
   digitalWrite(13, LOW);
-
+  
   //pinMode(XP, OUTPUT);
   pinMode(XM, OUTPUT);
   pinMode(YP, OUTPUT);
   //pinMode(YM, OUTPUT);
 
+  
+  //currentHour=now.hour();
+  //currentMinute=now.minute();
+  if (currentMinute != pastMinute){
+    statusBar(currentHour, currentMinute);
+    pastMinute = currentMinute;
+  }
+
   if (p.z > MINPRESSURE && p.z < MAXPRESSURE) {
     p.x = map(p.x, TS_MINX, TS_MAXX, 0, tft.width());
     p.y = map(p.y, TS_MINY, TS_MAXY, 0, tft.height());
-    
-    menuSelect = menuSelected(p.x, p.y);
+    x=p.x;
+    y=p.y;
+    menuSelect = menuSelected(x, y);
   }
-  
+
+  if ( menuSelect!=0 ){
+    options(menuSelect);
+  }
   
 }
 
-// Wait one touch
+
 TSPoint waitOneTouch() {
  // wait 1 touch to exit function
   TSPoint p;
@@ -138,14 +195,190 @@ TSPoint waitOneTouch() {
 }
 
 
+
+void options (int opt){
+
+  int x1 = 0;
+  int y1 = 0;
+  int buttonSelect = 0;
+  drawSubmenu(opt);
+  delay(50);
+  if (opt != 1) {
+    reDrawInput(opt);
+  }
+
+  // while "back" button is not pressed, loop
+  while (!back(x1, y1)){
+  digitalWrite(13, HIGH);
+  TSPoint p = ts.getPoint();
+  digitalWrite(13, LOW);
+  pinMode(XM, OUTPUT);
+  pinMode(YP, OUTPUT);
+   
+  //currentHour=now.hour();
+  //currentMinute=now.minute();
+  if (currentMinute != pastMinute){
+    statusBar(currentHour, currentMinute);
+    pastMinute = currentMinute;
+  }
+ 
+  if (p.z > MINPRESSURE && p.z < MAXPRESSURE) {
+    p.x = map(p.x, TS_MINX, TS_MAXX, 0, tft.width());
+    p.y = map(p.y, TS_MINY, TS_MAXY, 0, tft.height());
+    x1 = p.x;
+    y1 = p.y;
+    buttonSelect = buttonSelected(x1, y1, opt);
+    }
+    if (buttonSelect == 1){
+      reDrawInput(opt);
+      buttonSelect = 0;
+      delay(150);
+      
+    }
+  
+
+  
+  }
+
+  // on press of "back" button
+  drawMenu();
+  x=tft.height();
+  y=tft.width();
+  menuSelect=0;
+}
+
+void reDrawInput(int optRe){
+  tft.fillRect(BORDER, STATUSBAR+BORDER, MENUW*2+BORDER, STATUSBAR, YELLOW);
+  tft.setTextSize (3);
+  tft.setTextColor(DARKPINK);
+  
+  switch (optRe){
+    case 1:
+    
+
+    break;
+    case 2:
+    tft.setCursor(BORDER+50, STATUSBAR+BORDER+10);
+    tft.print(setHour);
+    tft.print(" : ");
+    tft.print(setMin);
+
+    break;
+    case 3:
+    tft.setCursor(BORDER+50, STATUSBAR+BORDER+10);
+    tft.print(alarmHour);
+    tft.print(" : ");
+    tft.print(alarmMin);
+
+    break;
+    case 4:
+    tft.setCursor(BORDER+50, STATUSBAR+BORDER+10);
+    tft.print(shutHour);
+    tft.print(" : ");
+    tft.print(shutMin);
+
+    break;
+    default:
+    break;
+  }
+  
+}
+
+void drawSubmenu (int optSub){
+  tft.setTextSize (2);
+  tft.setTextColor(DARKGREY);
+  secondMenublank();
+  tft.fillRect(BORDER, tft.height()-BORDER-STATUSBAR, MENUW*2+BORDER, STATUSBAR, DARKPINK);
+  tft.setCursor (tft.width()/2-25, tft.height()-BORDER-STATUSBAR+12);
+  tft.println("BACK");
+
+  switch (optSub){
+    case 1:
+    
+
+    break;
+    case 2:
+    timeButtons();
+
+    break;
+    case 3:
+    timeButtons();
+
+    break;
+    case 4:
+    timeButtons();
+
+    break;
+    default:
+    break;
+  }
+
+
+
+  
+}
+
+void timeButtons (){
+  tft.setTextSize (5);
+  tft.setTextColor(GREEN);
+
+  tft.fillRect(BORDER, STATUSBAR+BORDER, MENUW*2+BORDER, STATUSBAR, YELLOW);
+  tft.fillRect(BORDER, STATUSBAR*2+BORDER*2, MENUW, TBUTTON, LIGHTGREY);
+  tft.setCursor (BORDER+40, STATUSBAR*2+BORDER*2+20);
+  tft.println("+");
+  tft.fillRect(BORDER*2+MENUW, STATUSBAR*2+BORDER*2, MENUW, TBUTTON, LIGHTGREY);
+  tft.setCursor (BORDER*2+MENUW+40, STATUSBAR*2+BORDER*2+20);
+  tft.println("+");
+  tft.fillRect(BORDER, STATUSBAR*2+BORDER*3+TBUTTON, MENUW, TBUTTON, LIGHTGREY);
+  tft.setCursor (BORDER+40, STATUSBAR*2+BORDER*3+TBUTTON+20);
+  tft.println("-");
+  tft.fillRect(BORDER*2+MENUW, STATUSBAR*2+BORDER*3+TBUTTON, MENUW, TBUTTON, LIGHTGREY);
+  tft.setCursor (BORDER*2+MENUW+40, STATUSBAR*2+BORDER*3+TBUTTON+20);
+  tft.println("-");
+    
+}
+
+int buttonSelected (int xb, int yb, int optSel){
+  switch (optSel){
+    case 1:
+    
+
+    break;
+    case 2:
+    if (xb > BORDER && yb > STATUSBAR*2+BORDER*2 && xb < BORDER+MENUW && yb < STATUSBAR*2+BORDER*2+TBUTTON) {
+      setHour++;
+      if (setHour > 23) { setHour = 0; }
+      return 1;
+    }
+
+    break;
+    case 3:
+    
+
+    break;
+    case 4:
+    
+
+    break;
+    default:
+    break;
+  }
+  return 0;
+}
+
+bool back (int xx, int yy){
+  if ( xx > BORDER && xx < BORDER*2+MENUW*2 && yy > tft.height()-BORDER-STATUSBAR && yy < tft.height()-BORDER) { return true; }
+  else { return false; }
+}
+
 void drawBorder (){
   tft.fillScreen(DARKGREY);
   tft.fillRect(BORDER, BORDER, (tft.width() - BORDER * 2), (tft.height() - BORDER * 2), LIGHTGREY);
 }
 
-void statusBar (){
+void statusBar (int thour, int tmin){
   tft.fillRect(0, 0, tft.width(), STATUSBAR, LIGHTGREY);
-  drawTime();
+  drawTime(thour, tmin);
 }
 
 void drawMenu (){
@@ -185,10 +418,16 @@ int menuSelected(int x, int y){
   return a;
 }
 
+void secondMenublank (){
+    tft.fillRect(0, STATUSBAR, tft.width(), tft.height() - STATUSBAR, DARKGREY);
+}
 
-void drawTime(){
+void drawTime(int a, int b){
     
-    String timeString = "10:33";
+    String timeString = "";
+    timeString+=a;
+    timeString+=":";
+    timeString+=b;
     String lastTimeON = "09:16";
     int duration = 34;
     int galUsed = 14;
@@ -218,6 +457,21 @@ void drawTime(){
     tft.println(galUsed);
 }
 
+byte decToBcd(byte val){
+// Convert normal decimal numbers to binary coded decimal
+  return ( (val/10*16) + (val%10) );
+}
 
+void setTime(byte hour, byte minute) {
+
+  Wire.beginTransmission(DS1307_ADDRESS);
+  Wire.write(zero); //stop Oscillator
+  Wire.write(decToBcd(10));
+  Wire.write(decToBcd(minute));
+  Wire.write(decToBcd(hour));
+  Wire.write(zero); //start
+  Wire.endTransmission();
+
+}
   
   
