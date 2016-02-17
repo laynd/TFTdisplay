@@ -21,8 +21,8 @@ Daniel Lameka 2/12/2016
 #define OFF HIGH
 #define RELAY 4
 
-byte zero = 0x00; // workaround for issue #52 time module related
-RTC_DS1307 RTC;   // time module related
+//byte zero = 0x00; // workaround for issue #52 time module related
+//RTC_DS1307 RTC;   // time module related
 
 #if defined(__SAM3X8E__)
     #undef __FlashStringHelper::F(string_literal)
@@ -50,7 +50,7 @@ TouchScreen ts = TouchScreen(XP, YP, XM, YM, 300);
 #define LCD_WR A1
 #define LCD_RD A0
 // optional
-#define LCD_RESET A4
+#define LCD_RESET 0
 
 // Assign human-readable names to some common 16-bit color values:
 #define	BLACK   0x0000
@@ -75,27 +75,35 @@ TouchScreen ts = TouchScreen(XP, YP, XM, YM, 300);
 
 Adafruit_TFTLCD tft(LCD_CS, LCD_CD, LCD_WR, LCD_RD, LCD_RESET);
 
+/*
 const unsigned char R2D2[] PROGMEM = {
 80, 78, 152, 189, 133, 70, 91, 167, 185,
 };
-
+*/
 int menuSelect = 0;
 int currentHour=0;
 int currentMinute=0;
 int pastMinute=0;
 int x,y, setHour, setMin, alarmHour, alarmMin, shutHour, shutMin;
 
-DateTime now;
+//DateTime now;
 
 
 void setup(void) {
   Serial.begin(BAUD);
   Serial.println("Water Pump Controller V 0.1");
-  RTC.begin(); 
+/*
+   RTC.begin(); 
   if (! RTC.isrunning()) {Serial.println("RTC is NOT running!");}
-  //now = RTC.now();
-  //currentHour=now.hour();
-  //currentMinute=now.minute();
+  now = RTC.now();
+  currentHour=now.hour();
+  currentMinute=now.minute();
+  Serial.print(currentHour);
+    Serial.print(":");
+    Serial.println(currentMinute);
+*/
+  
+  delay(10);
 
   setHour = 0;
   setMin = 0;
@@ -104,9 +112,7 @@ void setup(void) {
   shutHour = 0;
   shutMin = 0;
 
-  currentHour=1;
-  currentMinute=27;
-  pastMinute=currentMinute;
+ 
   
    //startPlayback(R2D2, sizeof(R2D2)); //connect speaker positive wire to pin 11 and negative to ground 
   // to stop use stopPlayback(); function
@@ -115,6 +121,12 @@ void setup(void) {
   tft.setRotation(0); // Need for the Mega, please changed for your choice or rotation initial
 
   drawBorder();
+
+/*
+ ;
+ */   
+  pastMinute=currentMinute;
+  
   
   // Initial screen
   
@@ -143,6 +155,9 @@ void setup(void) {
 
   x=0;
   y=0;
+
+ 
+  
 }
 
 
@@ -151,21 +166,30 @@ void setup(void) {
 
 void loop()
 {
+  
   digitalWrite(13, HIGH);
   TSPoint p = ts.getPoint();
+  delay(1);
   digitalWrite(13, LOW);
   
   //pinMode(XP, OUTPUT);
   pinMode(XM, OUTPUT);
   pinMode(YP, OUTPUT);
   //pinMode(YM, OUTPUT);
-
   
   //currentHour=now.hour();
   //currentMinute=now.minute();
+
+   Serial.print(currentHour);
+    Serial.print(":");
+    Serial.println(currentMinute);
+ 
   if (currentMinute != pastMinute){
     statusBar(currentHour, currentMinute);
     pastMinute = currentMinute;
+    Serial.print(currentHour);
+    Serial.print(":");
+    Serial.println(currentMinute);
   }
 
   if (p.z > MINPRESSURE && p.z < MAXPRESSURE) {
@@ -461,7 +485,7 @@ byte decToBcd(byte val){
 // Convert normal decimal numbers to binary coded decimal
   return ( (val/10*16) + (val%10) );
 }
-
+/*
 void setTime(byte hour, byte minute) {
 
   Wire.beginTransmission(DS1307_ADDRESS);
@@ -473,5 +497,7 @@ void setTime(byte hour, byte minute) {
   Wire.endTransmission();
 
 }
-  
-  
+*/  
+
+
+
