@@ -14,6 +14,8 @@ Daniel Lameka 2/12/2016
 #include "Wire.h"   // for time module lib
 #include "RTClib.h" // time module lib
 #include "PCM.h"
+#include "SPI.h"
+#include "SD.h"
 
 #define DS1307_ADDRESS 0x68
 #define BAUD 9600
@@ -50,7 +52,7 @@ TouchScreen ts = TouchScreen(XP, YP, XM, YM, 300);
 #define LCD_WR A1
 #define LCD_RD A0
 // optional
-#define LCD_RESET 0
+#define LCD_RESET A4
 
 // Assign human-readable names to some common 16-bit color values:
 #define	BLACK   0x0000
@@ -206,6 +208,7 @@ void loop()
   
 }
 
+// supplimentary functions
 
 TSPoint waitOneTouch() {
  // wait 1 touch to exit function
@@ -218,10 +221,8 @@ TSPoint waitOneTouch() {
   return p;
 }
 
-
-
+// loop function for selected option
 void options (int opt){
-
   int x1 = 0;
   int y1 = 0;
   int buttonSelect = 0;
@@ -271,43 +272,43 @@ void options (int opt){
   menuSelect=0;
 }
 
+// redrawing input line when pressing on + - buttons in submenu
 void reDrawInput(int optRe){
   tft.fillRect(BORDER, STATUSBAR+BORDER, MENUW*2+BORDER, STATUSBAR, YELLOW);
   tft.setTextSize (3);
   tft.setTextColor(DARKPINK);
-  
   switch (optRe){
     case 1:
-    
-
     break;
     case 2:
-    tft.setCursor(BORDER+50, STATUSBAR+BORDER+10);
+    tft.setCursor(BORDER+45, STATUSBAR+BORDER+10);
     tft.print(setHour);
-    tft.print(" : ");
+    tft.setCursor((BORDER*2+MENUW*2)/2-3, STATUSBAR+BORDER+10);
+    tft.print(":");
+    tft.setCursor((BORDER*2+MENUW*2)/2+45, STATUSBAR+BORDER+10);
     tft.print(setMin);
-
     break;
     case 3:
-    tft.setCursor(BORDER+50, STATUSBAR+BORDER+10);
+    tft.setCursor(BORDER+45, STATUSBAR+BORDER+10);
     tft.print(alarmHour);
-    tft.print(" : ");
+    tft.setCursor((BORDER*2+MENUW*2)/2-3, STATUSBAR+BORDER+10);
+    tft.print(":");
+    tft.setCursor((BORDER*2+MENUW*2)/2+45, STATUSBAR+BORDER+10);
     tft.print(alarmMin);
-
     break;
     case 4:
-    tft.setCursor(BORDER+50, STATUSBAR+BORDER+10);
+    tft.setCursor(BORDER+45, STATUSBAR+BORDER+10);
     tft.print(shutHour);
-    tft.print(" : ");
+    tft.setCursor((BORDER*2+MENUW*2)/2-3, STATUSBAR+BORDER+10);
+    tft.print(":");
+    tft.setCursor((BORDER*2+MENUW*2)/2+45, STATUSBAR+BORDER+10);
     tft.print(shutMin);
-
     break;
     default:
     break;
   }
-  
 }
-
+// drawing submenu based on menu chosen
 void drawSubmenu (int optSub){
   tft.setTextSize (2);
   tft.setTextColor(DARKGREY);
@@ -323,15 +324,12 @@ void drawSubmenu (int optSub){
     break;
     case 2:
     timeButtons();
-
     break;
     case 3:
     timeButtons();
-
     break;
     case 4:
     timeButtons();
-
     break;
     default:
     break;
@@ -341,7 +339,7 @@ void drawSubmenu (int optSub){
 
   
 }
-
+// drawing menu buttons for + - submenu
 void timeButtons (){
   tft.setTextSize (5);
   tft.setTextColor(GREEN);
@@ -361,12 +359,10 @@ void timeButtons (){
   tft.println("-");
     
 }
-
+// function recognising touch press on submenu and adjusting time selection accordingly
 int buttonSelected (int xb, int yb, int optSel){
   switch (optSel){
     case 1:
-    
-
     break;
     case 2:
     if (xb > BORDER && yb > STATUSBAR*2+BORDER*2 && xb < BORDER+MENUW && yb < STATUSBAR*2+BORDER*2+TBUTTON) {
@@ -374,43 +370,93 @@ int buttonSelected (int xb, int yb, int optSel){
       if (setHour > 23) { setHour = 0; }
       return 1;
     }
-
+    if (xb > BORDER*2+MENUW && yb > STATUSBAR*2+BORDER*2 && xb < BORDER*2+MENUW*2 && yb < STATUSBAR*2+BORDER*2+TBUTTON) {
+      setMin++;
+      if (setMin > 59) { setMin = 0; }
+      return 1;
+    }
+    if (xb > BORDER && yb > STATUSBAR*2+BORDER*3+TBUTTON && xb < BORDER+MENUW && yb < STATUSBAR*2+BORDER*3+TBUTTON*2) {
+      setHour--;
+      if (setHour < 0) { setHour = 23; }
+      return 1;
+    }
+    if (xb > BORDER*2+MENUW && yb > STATUSBAR*2+BORDER*3+TBUTTON && xb < BORDER*2+MENUW*2 && yb < STATUSBAR*2+BORDER*3+TBUTTON*2) {
+      setMin--;
+      if (setMin < 0) { setMin = 59; }
+      return 1;
+    }
     break;
+    
     case 3:
-    
-
+    if (xb > BORDER && yb > STATUSBAR*2+BORDER*2 && xb < BORDER+MENUW && yb < STATUSBAR*2+BORDER*2+TBUTTON) {
+      alarmHour++;
+      if (alarmHour > 23) { alarmHour = 0; }
+      return 1;
+    }
+    if (xb > BORDER*2+MENUW && yb > STATUSBAR*2+BORDER*2 && xb < BORDER*2+MENUW*2 && yb < STATUSBAR*2+BORDER*2+TBUTTON) {
+      alarmMin++;
+      if (alarmMin > 59) { alarmMin = 0; }
+      return 1;
+    }
+    if (xb > BORDER && yb > STATUSBAR*2+BORDER*3+TBUTTON && xb < BORDER+MENUW && yb < STATUSBAR*2+BORDER*3+TBUTTON*2) {
+      alarmHour--;
+      if (alarmHour < 0) { alarmHour = 23; }
+      return 1;
+    }
+    if (xb > BORDER*2+MENUW && yb > STATUSBAR*2+BORDER*3+TBUTTON && xb < BORDER*2+MENUW*2 && yb < STATUSBAR*2+BORDER*3+TBUTTON*2) {
+      alarmMin--;
+      if (alarmMin < 0) { alarmMin = 59; }
+      return 1;
+    }
     break;
-    case 4:
     
-
+    case 4:
+    if (xb > BORDER && yb > STATUSBAR*2+BORDER*2 && xb < BORDER+MENUW && yb < STATUSBAR*2+BORDER*2+TBUTTON) {
+      shutHour++;
+      if (shutHour > 23) { shutHour = 0; }
+      return 1;
+    }
+    if (xb > BORDER*2+MENUW && yb > STATUSBAR*2+BORDER*2 && xb < BORDER*2+MENUW*2 && yb < STATUSBAR*2+BORDER*2+TBUTTON) {
+      shutMin++;
+      if (shutMin > 59) { shutMin = 0; }
+      return 1;
+    }
+    if (xb > BORDER && yb > STATUSBAR*2+BORDER*3+TBUTTON && xb < BORDER+MENUW && yb < STATUSBAR*2+BORDER*3+TBUTTON*2) {
+      shutHour--;
+      if (shutHour < 0) { shutHour = 23; }
+      return 1;
+    }
+    if (xb > BORDER*2+MENUW && yb > STATUSBAR*2+BORDER*3+TBUTTON && xb < BORDER*2+MENUW*2 && yb < STATUSBAR*2+BORDER*3+TBUTTON*2) {
+      shutMin--;
+      if (shutMin < 0) { shutMin = 59; }
+      return 1;
+    }
     break;
     default:
     break;
   }
   return 0;
 }
-
+// back button returns TRUE or FALSE on press
 bool back (int xx, int yy){
   if ( xx > BORDER && xx < BORDER*2+MENUW*2 && yy > tft.height()-BORDER-STATUSBAR && yy < tft.height()-BORDER) { return true; }
   else { return false; }
 }
-
+// drawing border around buttons
 void drawBorder (){
   tft.fillScreen(DARKGREY);
   tft.fillRect(BORDER, BORDER, (tft.width() - BORDER * 2), (tft.height() - BORDER * 2), LIGHTGREY);
 }
-
+// drawing status bar
 void statusBar (int thour, int tmin){
   tft.fillRect(0, 0, tft.width(), STATUSBAR, LIGHTGREY);
   drawTime(thour, tmin);
 }
-
+// drawing main menu
 void drawMenu (){
   tft.setTextSize (2);
   tft.setTextColor(YELLOW);
-  
   tft.fillRect(0, STATUSBAR, tft.width(), tft.height(), DARKGREY);
-  
   tft.fillRect(BORDER, STATUSBAR+BORDER, MENUW, MENUH, LIGHTGREY);
   tft.setCursor (BORDER+17, STATUSBAR+BORDER+55);
   tft.println("Report");
@@ -427,9 +473,8 @@ void drawMenu (){
   tft.println("Till");
   tft.setCursor (MENUW+BORDER*2+10, STATUSBAR+MENUH+BORDER*2+70);
   tft.println("ShutOFF");
-  
 }
-
+// touch press function for main menu selection
 int menuSelected(int x, int y){
   int a;
   if(x > BORDER && x < BORDER+MENUW && y > STATUSBAR+BORDER && y < MENUH+BORDER+STATUSBAR) { a = 1; }
@@ -438,16 +483,14 @@ int menuSelected(int x, int y){
   if(x > MENUW+BORDER*2 && x < MENUW*2+BORDER*2 && y > MENUH+STATUSBAR+BORDER*2 && y < MENUH*2+STATUSBAR+BORDER*2) { a = 4; }
   Serial.print("A: ");
   Serial.println(a);
-  
   return a;
 }
-
+// clearning screen before drawing submenu
 void secondMenublank (){
     tft.fillRect(0, STATUSBAR, tft.width(), tft.height() - STATUSBAR, DARKGREY);
 }
-
+// status bar refresh
 void drawTime(int a, int b){
-    
     String timeString = "";
     timeString+=a;
     timeString+=":";
@@ -480,9 +523,8 @@ void drawTime(int a, int b){
     tft.setCursor(88, 26);
     tft.println(galUsed);
 }
-
-byte decToBcd(byte val){
 // Convert normal decimal numbers to binary coded decimal
+byte decToBcd(byte val){
   return ( (val/10*16) + (val%10) );
 }
 /*
