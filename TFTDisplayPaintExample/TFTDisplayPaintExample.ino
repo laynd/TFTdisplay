@@ -23,8 +23,8 @@ Daniel Lameka 2/12/2016
 #define OFF HIGH
 #define RELAY 4
 
-//byte zero = 0x00; // workaround for issue #52 time module related
-//RTC_DS1307 RTC;   // time module related
+byte zero = 0x00; // workaround for issue #52 time module related
+RTC_DS1307 RTC;   // time module related
 
 #if defined(__SAM3X8E__)
     #undef __FlashStringHelper::F(string_literal)
@@ -86,16 +86,18 @@ int menuSelect = 0;
 int currentHour=0;
 int currentMinute=0;
 int pastMinute=0;
-int x,y, setHour, setMin, alarmHour, alarmMin, shutHour, shutMin;
+int x,y, setHour, setMin, alarmHour, alarmMin, shutHour, shutMin, statCount;
 
-//DateTime now;
+DateTime now;
 
 
 void setup(void) {
   Serial.begin(BAUD);
   Serial.println("Water Pump Controller V 0.1");
-/*
-   RTC.begin(); 
+  pinMode(53, OUTPUT);
+  digitalWrite(53, HIGH);
+  
+  RTC.begin(); 
   if (! RTC.isrunning()) {Serial.println("RTC is NOT running!");}
   now = RTC.now();
   currentHour=now.hour();
@@ -103,7 +105,7 @@ void setup(void) {
   Serial.print(currentHour);
     Serial.print(":");
     Serial.println(currentMinute);
-*/
+
   
   delay(10);
 
@@ -154,6 +156,7 @@ void setup(void) {
   statusBar(currentHour, currentMinute);
   drawMenu();
   pinMode(13, OUTPUT);
+  
 
   x=0;
   y=0;
@@ -179,8 +182,9 @@ void loop()
   pinMode(YP, OUTPUT);
   //pinMode(YM, OUTPUT);
   
-  //currentHour=now.hour();
-  //currentMinute=now.minute();
+  now = RTC.now();
+  currentHour=now.hour();
+  currentMinute=now.minute();
 
    Serial.print(currentHour);
     Serial.print(":");
@@ -208,7 +212,7 @@ void loop()
   
 }
 
-// supplimentary functions
+// utility functions
 
 TSPoint waitOneTouch() {
  // wait 1 touch to exit function
@@ -223,6 +227,7 @@ TSPoint waitOneTouch() {
 
 // loop function for selected option
 void options (int opt){
+  
   int x1 = 0;
   int y1 = 0;
   int buttonSelect = 0;
@@ -239,9 +244,10 @@ void options (int opt){
   digitalWrite(13, LOW);
   pinMode(XM, OUTPUT);
   pinMode(YP, OUTPUT);
-   
-  //currentHour=now.hour();
-  //currentMinute=now.minute();
+  
+  now = RTC.now();
+  currentHour=now.hour();
+  currentMinute=now.minute();
   if (currentMinute != pastMinute){
     statusBar(currentHour, currentMinute);
     pastMinute = currentMinute;
@@ -385,6 +391,7 @@ int buttonSelected (int xb, int yb, int optSel){
       if (setMin < 0) { setMin = 59; }
       return 1;
     }
+    setTime(setHour, setMin);
     break;
     
     case 3:
@@ -439,7 +446,9 @@ int buttonSelected (int xb, int yb, int optSel){
 }
 // back button returns TRUE or FALSE on press
 bool back (int xx, int yy){
-  if ( xx > BORDER && xx < BORDER*2+MENUW*2 && yy > tft.height()-BORDER-STATUSBAR && yy < tft.height()-BORDER) { return true; }
+  if ( xx > BORDER && xx < BORDER*2+MENUW*2 && yy > tft.height()-BORDER-STATUSBAR && yy < tft.height()-BORDER) { 
+  return true; 
+}
   else { return false; }
 }
 // drawing border around buttons
@@ -527,7 +536,7 @@ void drawTime(int a, int b){
 byte decToBcd(byte val){
   return ( (val/10*16) + (val%10) );
 }
-/*
+
 void setTime(byte hour, byte minute) {
 
   Wire.beginTransmission(DS1307_ADDRESS);
@@ -539,7 +548,7 @@ void setTime(byte hour, byte minute) {
   Wire.endTransmission();
 
 }
-*/  
+ 
 
 
 
