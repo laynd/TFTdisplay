@@ -8,8 +8,8 @@ speaker pin 25 can only be changed in lib file
 pin 39 dedicated to +5 of RTC module
 pin 41 dedicated to GND of RTC module
 
-pin A9 - button with 10K pull down 
-pin A10 - sensor with 10K pull down
+pin - button with 10K pull down 
+pin 25 - sensor with 10K pull down
 
 pin 48 - SSR relay
 
@@ -31,7 +31,11 @@ pin 48 - SSR relay
 #define BAUD 9600
 #define ON LOW
 #define OFF HIGH
-#define RELAY 4
+#define BUTTONPIN 24
+#define SENSORPIN 25
+#define SSRPIN 48
+#define RTCPOSITIVE 39
+#define RTCNEGATIVE 41
 
 byte zero = 0x00; // workaround for issue #52 time module related
 RTC_DS1307 RTC;   // time module related
@@ -97,7 +101,7 @@ int menuSelect = 0;
 int currentHour=0;
 int currentMinute=0;
 int pastMinute=0;
-int x,y, setHour, setMin, alarmHour, alarmMin, shutHour, shutMin, statCount;
+int x,y, setHour, setMin, alarmHour, alarmMin, shutHour, shutMin, statCount, button, sensor;
 
 DateTime now;
 
@@ -105,10 +109,16 @@ DateTime now;
 void setup(void) {
   Serial.begin(BAUD);
   Serial.println("Water Pump Controller V 0.1");
-  pinMode(39, OUTPUT); // rtc +5V
-  pinMode(41, OUTPUT); // rtc GND
-  digitalWrite(39, HIGH);
-  digitalWrite(41, LOW);
+  pinMode(RTCPOSITIVE, OUTPUT); // rtc +5V
+  pinMode(RTCNEGATIVE, OUTPUT); // rtc GND
+  digitalWrite(RTCPOSITIVE, HIGH);
+  digitalWrite(RTCNEGATIVE, LOW);
+  
+  pinMode(SSRPIN, OUTPUT);
+  //pinMode(BUTTONPIN, INPUT);
+  //pinMode(SENSORPIN, INPUT);
+  
+  
   
   RTC.begin(); 
   if (! RTC.isrunning()) {Serial.println("RTC is NOT running!");}
@@ -161,6 +171,7 @@ void setup(void) {
   tft.setTextColor(DARKPINK);
   tft.println("Touch to proceed");
 
+  
   // Wait touch
   waitOneTouch();
   tft.fillScreen(DARKGREY);
@@ -173,6 +184,7 @@ void setup(void) {
 
   x=0;
   y=0;
+  
 
  
   
@@ -184,6 +196,14 @@ void setup(void) {
 
 void loop()
 {
+  button = analogRead(BUTTONPIN);
+  Serial.print(button);
+  if ( button > 0 ) {
+    digitalWrite(SSRPIN, HIGH);
+  }
+  if ( button == 0){
+    digitalWrite(SSRPIN, LOW);
+  }
   
   digitalWrite(13, HIGH);
   TSPoint p = ts.getPoint();
@@ -199,9 +219,9 @@ void loop()
   currentHour=now.hour();
   currentMinute=now.minute();
 
-   Serial.print(currentHour);
-    Serial.print(":");
-    Serial.println(currentMinute);
+   //Serial.print(currentHour);
+   // Serial.print(":");
+   // Serial.println(currentMinute);
  
   if (currentMinute != pastMinute){
     statusBar(currentHour, currentMinute);
