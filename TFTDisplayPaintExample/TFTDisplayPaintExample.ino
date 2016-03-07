@@ -107,6 +107,7 @@ DateTime now;
 
 void setup(void) {
   Serial.begin(BAUD);
+  Serial1.begin(BAUD);
   Serial.println("Water Pump Controller V 0.1");
   pinMode(RTCPOSITIVE, OUTPUT); // rtc +5V
   pinMode(RTCNEGATIVE, OUTPUT); // rtc GND
@@ -154,8 +155,7 @@ void setup(void) {
   tft.println("V 0.1");
   tft.setCursor (75, 250);
   tft.setTextSize (1);
-  tft.setTextColor(DARKPINK);
-  tft.println("Touch to proceed");
+  
 
   
   delay(5000);
@@ -192,7 +192,7 @@ void loop()
     x=p.x;
     y=p.y;
     menuSelect = menuSelected(x, y);
-    Serial.print("&");
+    Serial1.print("&");
   }
   if ( menuSelect!=0 ){
     options(menuSelect);
@@ -271,7 +271,7 @@ void options (int opt){
     x1 = p.x;
     y1 = p.y;
     buttonSelect = buttonSelected(x1, y1, opt);
-    Serial.print("&");
+    Serial1.print("&");
     }
     if (buttonSelect == 1){
       reDrawInput(opt);
