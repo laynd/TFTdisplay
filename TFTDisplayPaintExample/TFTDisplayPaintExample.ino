@@ -1,5 +1,5 @@
 /*
-Water pump controller V 0.1
+Water pump controller V 1.16
 Built upon Adafruit TFT library examples
 Daniel Lameka 2/12/2016
 
@@ -29,13 +29,14 @@ pin 48 - SSR relay
 
 #define DS1307_ADDRESS 0x68
 #define BAUD 9600
-#define ON LOW
-#define OFF HIGH
+#define OFF LOW
+#define ON HIGH
 #define BUTTONPIN 24
 #define SENSORPIN 25
 #define SSRPIN 48
 #define RTCPOSITIVE 39
 #define RTCNEGATIVE 41
+#define SDPIN 53
 
 byte zero = 0x00; // workaround for issue #52 time module related
 RTC_DS1307 RTC;   // time module related
@@ -91,8 +92,8 @@ TouchScreen ts = TouchScreen(XP, YP, XM, YM, 300);
 
 Adafruit_TFTLCD tft(LCD_CS, LCD_CD, LCD_WR, LCD_RD, LCD_RESET);
 
-//Button button = Button(BUTTONPIN,PULLUP);
-//Button sensor = Button(SENSORPIN, PULLUP);
+Button button = Button(BUTTONPIN, BUTTON_PULLUP_INTERNAL, true, 50);
+Button sensor = Button(SENSORPIN, BUTTON_PULLUP_INTERNAL, true, 50);
 
 
 int menuSelect = 0;
@@ -100,15 +101,16 @@ int currentHour=0;
 int currentMinute=0;
 int pastMinute=0;
 int x,y, setHour, setMin, alarmHour, alarmMin, shutHour, shutMin, statCount, stateSensor;
-bool state;
+int sensorTriggerMin, sensorTriggerHour;
+bool state, firstTimeTrigger;
 
 DateTime now;
-
+File WPFile;
 
 void setup(void) {
   Serial.begin(BAUD);
   Serial1.begin(BAUD);
-  Serial.println("Water Pump Controller V 0.1");
+  Serial.println("Water Pump Controller V 1.16");
   pinMode(RTCPOSITIVE, OUTPUT); // rtc +5V
   pinMode(RTCNEGATIVE, OUTPUT); // rtc GND
   digitalWrite(RTCPOSITIVE, HIGH);
@@ -134,8 +136,43 @@ void setup(void) {
   x = 0;
   y = 0;
   stateSensor = 0;
+  firstTimeTrigger=true;
+  sensorTriggerMin=-1;
+  sensorTriggerHour=-1;
+  
 
- 
+  if (!SD.begin(SDPIN)) {
+    Serial.println("Card failed, or not present");
+  }
+  
+  /*
+  // open a new file and immediately close it:
+  Serial.println("Creating wp.log...");
+  WPFile = SD.open("wp.log", FILE_WRITE);
+  WPFile.close();
+  // Check to see if the file exists:
+  if (SD.exists("wp.log")) {
+    Serial.println("wp.log exists.");
+  } else {
+    Serial.println("wp.llog doesn't exist.");
+  }
+
+  // delete the file:
+  Serial.println("Removing file");
+  SD.remove("wp.log");
+  
+  
+
+  // readinng data file 
+  WPFile = SD.open("wp.log");
+  if (WPFile) {
+    while (WPFile.available()) {
+      WPFile.read();
+    }
+    WPFile.close();
+  }
+
+  */
   
   tft.reset();
   tft.begin(0x9341); // SDFP5408
@@ -152,7 +189,7 @@ void setup(void) {
   tft.println("Controller");
   tft.setCursor (90, 160);
   tft.setTextSize (2);
-  tft.println("V 0.1");
+  tft.println("V 1.16");
   tft.setCursor (75, 250);
   tft.setTextSize (1);
   
@@ -173,10 +210,35 @@ void loop()
   now = RTC.now();
   currentHour=now.hour();
   currentMinute=now.minute();
+  
+  
+  // sensor and button related processes
+  if ( sensor.isPressed() ){
+    if ( firstTimeTrigger ){
+    digitalWrite(SSRPIN, ON);
+    sensorTriggerHour=currentHour;
+    sensorTriggerMin=currentMinute;
+    firstTimeTrigger = false;
+    }
+    
+  }else {
+    if ( !firstTimeTrigger ){
+    digitalWrite(SSRPIN, OFF);
+    sensorTriggerHour=-1;
+    sensorTriggerMin=-1;
+    firstTimeTrigger = true;
+    }
+  }
+  
+  //timePassedONtrigger=timePassed(sensorTriggerHour, sensorTriggerMin);
+  
+  
   if (currentMinute != pastMinute){
     statusBar(currentHour, currentMinute);
     pastMinute = currentMinute;
   }
+  
+  
   // touch related
   digitalWrite(13, HIGH);
   TSPoint p = ts.getPoint();
@@ -197,31 +259,8 @@ void loop()
   if ( menuSelect!=0 ){
     options(menuSelect);
   }
-
-/*
-  if ( button.isPressed() && button.stateChanged() ) { 
-    Serial.print("button status changed");
-    stateSensor++;
-  }
-  if ( !button.isPressed() && button.stateChanged() ) { 
-    Serial.print("button status changed");
-    //digitalWrite(SSRPIN, LOW);
-      Serial.println("Button not pressed");
-    //stateSensor++;
-  }
   
-  if ( stateSensor == 1 ) {
-    if ( button.isPressed() ){
-      //digitalWrite(SSRPIN, HIGH);
-      Serial.println("Button pressed");
-    }
-    else {
-      //digitalWrite(SSRPIN, LOW);
-      Serial.println("Button not pressed");
-    }
-    stateSensor = 0;
-  }
-  */      
+  
 
 }
 
@@ -279,6 +318,12 @@ void options (int opt){
       delay(150);
       
     }
+  // sensor and button related processes
+  if ( sensor.isPressed() ){
+    digitalWrite(SSRPIN, ON);
+  }else {
+    digitalWrite(SSRPIN, OFF);
+  }
   
  }
 
