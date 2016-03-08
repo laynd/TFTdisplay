@@ -92,8 +92,8 @@ TouchScreen ts = TouchScreen(XP, YP, XM, YM, 300);
 
 Adafruit_TFTLCD tft(LCD_CS, LCD_CD, LCD_WR, LCD_RD, LCD_RESET);
 
-Button button = Button(BUTTONPIN, BUTTON_PULLUP_INTERNAL, true, 50);
-Button sensor = Button(SENSORPIN, BUTTON_PULLUP_INTERNAL, true, 50);
+Button button = Button(BUTTONPIN, BUTTON_PULLUP_INTERNAL, true, 100);
+Button sensor = Button(SENSORPIN, BUTTON_PULLUP_INTERNAL, true, 1000);
 
 
 int menuSelect = 0;
@@ -195,7 +195,7 @@ void setup(void) {
   
 
   
-  delay(5000);
+  delay(2000);
   //waitOneTouch();
   tft.fillScreen(DARKGREY);
   statusBar(currentHour, currentMinute);
@@ -212,10 +212,13 @@ void loop()
   currentMinute=now.minute();
   
   
+  
+  
   // sensor and button related processes
   if ( sensor.isPressed() ){
     if ( firstTimeTrigger ){
     digitalWrite(SSRPIN, ON);
+    Serial.println("SSR ON");
     sensorTriggerHour=currentHour;
     sensorTriggerMin=currentMinute;
     firstTimeTrigger = false;
@@ -224,6 +227,7 @@ void loop()
   }else {
     if ( !firstTimeTrigger ){
     digitalWrite(SSRPIN, OFF);
+    Serial.println("SSR OFF");
     sensorTriggerHour=-1;
     sensorTriggerMin=-1;
     firstTimeTrigger = true;
