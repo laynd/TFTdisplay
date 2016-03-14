@@ -101,7 +101,7 @@ int currentHour=0;
 int currentMinute=0;
 int pastMinute=0;
 int x,y, setHour, setMin, alarmHour, alarmMin, shutHour, shutMin, statCount, stateSensor;
-int sensorTriggerMin, sensorTriggerHour;
+int sensorTriggerMin, sensorTriggerHour, timePassedONtrigger;
 bool state, firstTimeTrigger;
 
 DateTime now;
@@ -120,15 +120,16 @@ void setup(void) {
   
   RTC.begin(); 
   if (! RTC.isrunning()) {Serial.println("RTC is NOT running!");}
+  RTC.adjust(DateTime(__DATE__, __TIME__));
   now = RTC.now();
   currentHour=now.hour();
   currentMinute=now.minute();
   pastMinute=currentMinute;
-  
+  setHour = currentHour;
+  setMin = currentMinute;
   
   delay(10);
-  setHour = 0;
-  setMin = 0;
+  
   alarmHour = 0;
   alarmMin = 0;
   shutHour = 0;
@@ -139,6 +140,7 @@ void setup(void) {
   firstTimeTrigger=true;
   sensorTriggerMin=-1;
   sensorTriggerHour=-1;
+  timePassedONtrigger=0;
   
 
   if (!SD.begin(SDPIN)) {
@@ -154,7 +156,7 @@ void setup(void) {
   if (SD.exists("wp.log")) {
     Serial.println("wp.log exists.");
   } else {
-    Serial.println("wp.llog doesn't exist.");
+    Serial.println("wp.log doesn't exist.");
   }
 
   // delete the file:
@@ -198,7 +200,7 @@ void setup(void) {
   delay(2000);
   //waitOneTouch();
   tft.fillScreen(DARKGREY);
-  statusBar(currentHour, currentMinute);
+  statusBar(currentHour, currentMinute, sensorTriggerHour, sensorTriggerMin);
   drawMenu();
   pinMode(13, OUTPUT);
 }
@@ -234,11 +236,11 @@ void loop()
     }
   }
   
-  //timePassedONtrigger=timePassed(sensorTriggerHour, sensorTriggerMin);
+  timePassedONtrigger=timePassed(sensorTriggerHour, sensorTriggerMin, currentHour, currentMinute);
   
   
   if (currentMinute != pastMinute){
-    statusBar(currentHour, currentMinute);
+    statusBar(currentHour, currentMinute, sensorTriggerHour, sensorTriggerMin);
     pastMinute = currentMinute;
   }
   
@@ -272,6 +274,27 @@ void loop()
 
 // utility functions
 
+
+
+
+int timePassed(int sth, int stm, int cr, int cm){
+  int ah = 0;
+  int am = 0;
+  if ( sth < 0){
+    return 0;
+  } else {
+    if (sth = 0){
+      if ( cr = 0){
+        ah = 0;
+      } else {
+        ah = 24 - cr;
+      }
+  }
+  
+}
+}
+
+
 TSPoint waitOneTouch() {
  // wait 1 touch to exit function
   TSPoint p;
@@ -300,7 +323,7 @@ void options (int opt){
   currentHour=now.hour();
   currentMinute=now.minute();
   if (currentMinute != pastMinute){
-    statusBar(currentHour, currentMinute);
+    statusBar(currentHour, currentMinute, sensorTriggerHour, sensorTriggerMin);
     pastMinute = currentMinute;
   }
   digitalWrite(13, HIGH);
@@ -348,27 +371,27 @@ void reDrawInput(int optRe){
     break;
     case 2:
     tft.setCursor(BORDER+45, STATUSBAR+BORDER+10);
-    tft.print(setHour);
+    printDigits(setHour);
     tft.setCursor((BORDER*2+MENUW*2)/2-3, STATUSBAR+BORDER+10);
     tft.print(":");
     tft.setCursor((BORDER*2+MENUW*2)/2+45, STATUSBAR+BORDER+10);
-    tft.print(setMin);
+    printDigits(setMin);
     break;
     case 3:
     tft.setCursor(BORDER+45, STATUSBAR+BORDER+10);
-    tft.print(alarmHour);
+    printDigits(alarmHour);
     tft.setCursor((BORDER*2+MENUW*2)/2-3, STATUSBAR+BORDER+10);
     tft.print(":");
     tft.setCursor((BORDER*2+MENUW*2)/2+45, STATUSBAR+BORDER+10);
-    tft.print(alarmMin);
+    printDigits(alarmMin);
     break;
     case 4:
     tft.setCursor(BORDER+45, STATUSBAR+BORDER+10);
-    tft.print(shutHour);
+    printDigits(shutHour);
     tft.setCursor((BORDER*2+MENUW*2)/2-3, STATUSBAR+BORDER+10);
     tft.print(":");
     tft.setCursor((BORDER*2+MENUW*2)/2+45, STATUSBAR+BORDER+10);
-    tft.print(shutMin);
+    printDigits(shutMin);
     break;
     default:
     break;
@@ -517,9 +540,9 @@ void drawBorder (){
   tft.fillRect(BORDER, BORDER, (tft.width() - BORDER * 2), (tft.height() - BORDER * 2), LIGHTGREY);
 }
 // drawing status bar
-void statusBar (int thour, int tmin){
+void statusBar (int thour, int tmin, int trhour, int trmin){
   tft.fillRect(0, 0, tft.width(), STATUSBAR, LIGHTGREY);
-  drawTime(thour, tmin);
+  drawTime(thour, tmin, trhour, trmin);
 }
 // drawing main menu
 void drawMenu (){
@@ -559,12 +582,37 @@ void secondMenublank (){
     tft.fillRect(0, STATUSBAR, tft.width(), tft.height() - STATUSBAR, DARKGREY);
 }
 // status bar refresh
-void drawTime(int a, int b){
+void drawTime(int a, int b, int c, int d){
     String timeString = "";
-    timeString+=a;
+    if (a<10) {
+      timeString+="0";
+      timeString+=a;
+    } else {
+      timeString+=a;
+    }
     timeString+=":";
-    timeString+=b;
-    String lastTimeON = "09:16";
+    if (b<10) {
+      timeString+="0";
+      timeString+=b;
+    } else {
+      timeString+=b;
+    }
+    
+    String lastTimeON = "";
+    if (c<10) {
+      lastTimeON+="0";
+      lastTimeON+=c;
+    } else {
+      lastTimeON+=c;
+    }
+    lastTimeON+=":";
+    if (d<10) {
+      lastTimeON+="0";
+      lastTimeON+=d;
+    } else {
+      lastTimeON+=d;
+    }
+    
     int duration = 34;
     int galUsed = 14;
     
@@ -608,7 +656,14 @@ void setTime(byte hour, byte minute) {
   Wire.endTransmission();
 
 }
+
  
+ // prints leading 0 for time 
+void printDigits(int digits){
+    if(digits < 10)
+    tft.print('0');
+    tft.print(digits);
+ }
 
 
 
