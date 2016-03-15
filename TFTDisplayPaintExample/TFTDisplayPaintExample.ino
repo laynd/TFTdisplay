@@ -101,10 +101,12 @@ int currentHour=0;
 int currentMinute=0;
 int pastMinute=0;
 int x,y, setHour, setMin, alarmHour, alarmMin, shutHour, shutMin, statCount, stateSensor;
-int sensorTriggerMin, sensorTriggerHour, timePassedONtrigger;
+int sensorTriggerMin, sensorTriggerHour, timePassedONtrigger, statTH, statTM;
 bool state, firstTimeTrigger;
 
 DateTime now;
+DateTime alarm;
+TimeSpan difference;
 File WPFile;
 
 void setup(void) {
@@ -141,6 +143,8 @@ void setup(void) {
   sensorTriggerMin=-1;
   sensorTriggerHour=-1;
   timePassedONtrigger=0;
+  statTH=0;
+  statTM=0;
   
 
   if (!SD.begin(SDPIN)) {
@@ -200,7 +204,7 @@ void setup(void) {
   delay(2000);
   //waitOneTouch();
   tft.fillScreen(DARKGREY);
-  statusBar(currentHour, currentMinute, sensorTriggerHour, sensorTriggerMin);
+  statusBar(currentHour, currentMinute, 0, 0);
   drawMenu();
   pinMode(13, OUTPUT);
 }
@@ -212,21 +216,32 @@ void loop()
   now = RTC.now();
   currentHour=now.hour();
   currentMinute=now.minute();
-  
+  setHour = currentHour;
+  setMin = currentMinute;
   
   
   
   // sensor and button related processes
   if ( sensor.isPressed() ){
+    delay(50);
     if ( firstTimeTrigger ){
     digitalWrite(SSRPIN, ON);
     Serial.println("SSR ON");
-    sensorTriggerHour=currentHour;
-    sensorTriggerMin=currentMinute;
+    alarm=RTC.now();
+    sensorTriggerHour=alarm.hour();
+    sensorTriggerMin=alarm.minute();
+
+    statTH=sensorTriggerHour;
+    statTM=sensorTriggerMin;
+    
     firstTimeTrigger = false;
+    }
+    if (currentMinute != pastMinute){
+    timePassedONtrigger=timePassed(sensorTriggerHour, sensorTriggerMin, currentHour, currentMinute);
     }
     
   }else {
+    delay(50);
     if ( !firstTimeTrigger ){
     digitalWrite(SSRPIN, OFF);
     Serial.println("SSR OFF");
@@ -236,12 +251,13 @@ void loop()
     }
   }
   
-  timePassedONtrigger=timePassed(sensorTriggerHour, sensorTriggerMin, currentHour, currentMinute);
+  
   
   
   if (currentMinute != pastMinute){
-    statusBar(currentHour, currentMinute, sensorTriggerHour, sensorTriggerMin);
+    statusBar(currentHour, currentMinute, statTH, statTM);
     pastMinute = currentMinute;
+    
   }
   
   
@@ -280,18 +296,18 @@ void loop()
 int timePassed(int sth, int stm, int cr, int cm){
   int ah = 0;
   int am = 0;
-  if ( sth < 0){
-    return 0;
-  } else {
-    if (sth = 0){
-      if ( cr = 0){
-        ah = 0;
-      } else {
-        ah = 24 - cr;
-      }
-  }
-  
-}
+  long int as = 0;
+  difference = now - alarm;
+  ah = difference.hours();
+  am = difference.minutes();
+  as = difference.totalseconds();
+  Serial.print("Hours passed: ");
+  Serial.println(ah);
+  Serial.print("minutes passed: ");
+  Serial.println(am);
+  Serial.print("total seconds passed: ");
+  Serial.println(as);
+  return 0;
 }
 
 
@@ -323,7 +339,7 @@ void options (int opt){
   currentHour=now.hour();
   currentMinute=now.minute();
   if (currentMinute != pastMinute){
-    statusBar(currentHour, currentMinute, sensorTriggerHour, sensorTriggerMin);
+    statusBar(currentHour, currentMinute, statTH, statTM);
     pastMinute = currentMinute;
   }
   digitalWrite(13, HIGH);
@@ -370,27 +386,27 @@ void reDrawInput(int optRe){
     case 1:
     break;
     case 2:
-    tft.setCursor(BORDER+45, STATUSBAR+BORDER+10);
+    tft.setCursor(BORDER+36, STATUSBAR+BORDER+10);
     printDigits(setHour);
     tft.setCursor((BORDER*2+MENUW*2)/2-3, STATUSBAR+BORDER+10);
     tft.print(":");
-    tft.setCursor((BORDER*2+MENUW*2)/2+45, STATUSBAR+BORDER+10);
+    tft.setCursor((BORDER*2+MENUW*2)/2+46, STATUSBAR+BORDER+10);
     printDigits(setMin);
     break;
     case 3:
-    tft.setCursor(BORDER+45, STATUSBAR+BORDER+10);
+    tft.setCursor(BORDER+36, STATUSBAR+BORDER+10);
     printDigits(alarmHour);
     tft.setCursor((BORDER*2+MENUW*2)/2-3, STATUSBAR+BORDER+10);
     tft.print(":");
-    tft.setCursor((BORDER*2+MENUW*2)/2+45, STATUSBAR+BORDER+10);
+    tft.setCursor((BORDER*2+MENUW*2)/2+46, STATUSBAR+BORDER+10);
     printDigits(alarmMin);
     break;
     case 4:
-    tft.setCursor(BORDER+45, STATUSBAR+BORDER+10);
+    tft.setCursor(BORDER+36, STATUSBAR+BORDER+10);
     printDigits(shutHour);
     tft.setCursor((BORDER*2+MENUW*2)/2-3, STATUSBAR+BORDER+10);
     tft.print(":");
-    tft.setCursor((BORDER*2+MENUW*2)/2+45, STATUSBAR+BORDER+10);
+    tft.setCursor((BORDER*2+MENUW*2)/2+46, STATUSBAR+BORDER+10);
     printDigits(shutMin);
     break;
     default:
