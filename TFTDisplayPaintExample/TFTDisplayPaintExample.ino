@@ -1,5 +1,5 @@
 /*
-Water pump controller V 1.16
+Water pump controller V 1.20
 Built upon Adafruit TFT library examples
 Daniel Lameka 2/12/2016
 
@@ -101,8 +101,10 @@ int currentHour=0;
 int currentMinute=0;
 int pastMinute=0;
 int x,y, setHour, setMin, alarmHour, alarmMin, shutHour, shutMin, statCount, stateSensor;
-int sensorTriggerMin, sensorTriggerHour, timePassedONtrigger, statTH, statTM;
+int sensorTriggerMin, sensorTriggerHour, statTH, statTM;
+long timePassedONtrigger, alarmsec, shutoffsec, dataread; 
 bool state, firstTimeTrigger;
+String datareadST;
 
 DateTime now;
 DateTime alarm;
@@ -112,7 +114,7 @@ File WPFile;
 void setup(void) {
   Serial.begin(BAUD);
   Serial1.begin(BAUD);
-  Serial.println("Water Pump Controller V 1.16");
+  Serial.println("Water Pump Controller V 1.20");
   pinMode(RTCPOSITIVE, OUTPUT); // rtc +5V
   pinMode(RTCNEGATIVE, OUTPUT); // rtc GND
   digitalWrite(RTCPOSITIVE, HIGH);
@@ -142,16 +144,18 @@ void setup(void) {
   firstTimeTrigger=true;
   sensorTriggerMin=-1;
   sensorTriggerHour=-1;
-  timePassedONtrigger=0;
+  timePassedONtrigger=0L;
   statTH=0;
   statTM=0;
+  alarmsec=3600L;
+  shutoffsec=3600L;
   
 
   if (!SD.begin(SDPIN)) {
     Serial.println("Card failed, or not present");
   }
   
-  /*
+  
   // open a new file and immediately close it:
   Serial.println("Creating wp.log...");
   WPFile = SD.open("wp.log", FILE_WRITE);
@@ -162,23 +166,36 @@ void setup(void) {
   } else {
     Serial.println("wp.log doesn't exist.");
   }
-
+/*
   // delete the file:
   Serial.println("Removing file");
   SD.remove("wp.log");
-  
+  */
   
 
   // readinng data file 
   WPFile = SD.open("wp.log");
   if (WPFile) {
     while (WPFile.available()) {
-      WPFile.read();
+      //Serial.write(WPFile.read());
+      dataread=WPFile.read();
+      if (isDigit(dataread)) {
+        datareadST += (char)dataread;
+      }
+      //if  (dataread == 35) {break;}
+      if (dataread == '\n') {
+        dataread=datareadST.toInt();
+        Serial.println(dataread);
+        datareadST="";
+      }
+      //
+      
+      delay(50);
     }
     WPFile.close();
   }
 
-  */
+ 
   
   tft.reset();
   tft.begin(0x9341); // SDFP5408
@@ -201,7 +218,7 @@ void setup(void) {
   
 
   
-  delay(2000);
+  delay(1000);
   //waitOneTouch();
   tft.fillScreen(DARKGREY);
   statusBar(currentHour, currentMinute, 0, 0);
@@ -228,16 +245,14 @@ void loop()
     digitalWrite(SSRPIN, ON);
     Serial.println("SSR ON");
     alarm=RTC.now();
-    sensorTriggerHour=alarm.hour();
-    sensorTriggerMin=alarm.minute();
+    statTH=alarm.hour();
+    statTM=alarm.minute();
 
-    statTH=sensorTriggerHour;
-    statTM=sensorTriggerMin;
-    
     firstTimeTrigger = false;
     }
     if (currentMinute != pastMinute){
-    timePassedONtrigger=timePassed(sensorTriggerHour, sensorTriggerMin, currentHour, currentMinute);
+    timePassedONtrigger=timePassed();
+    
     }
     
   }else {
@@ -245,8 +260,6 @@ void loop()
     if ( !firstTimeTrigger ){
     digitalWrite(SSRPIN, OFF);
     Serial.println("SSR OFF");
-    sensorTriggerHour=-1;
-    sensorTriggerMin=-1;
     firstTimeTrigger = true;
     }
   }
@@ -291,23 +304,29 @@ void loop()
 // utility functions
 
 
+int secTOmin(){
+}
+
+long HMtoSec(int ht, int mt){
+  long tyu=ht*3600L + mt*60L;
+  WPFile = SD.open("wp.log", FILE_WRITE);
+  
+  if (WPFile) {
+    WPFile.println(tyu, DEC);
+    WPFile.close();
+  }
+  return ht*3600L + mt*60L;
+  
+}
 
 
-int timePassed(int sth, int stm, int cr, int cm){
-  int ah = 0;
-  int am = 0;
-  long int as = 0;
+long timePassed(){
+  long as = 0;
   difference = now - alarm;
-  ah = difference.hours();
-  am = difference.minutes();
   as = difference.totalseconds();
-  Serial.print("Hours passed: ");
-  Serial.println(ah);
-  Serial.print("minutes passed: ");
-  Serial.println(am);
   Serial.print("total seconds passed: ");
   Serial.println(as);
-  return 0;
+  return as;
 }
 
 
@@ -400,6 +419,9 @@ void reDrawInput(int optRe){
     tft.print(":");
     tft.setCursor((BORDER*2+MENUW*2)/2+46, STATUSBAR+BORDER+10);
     printDigits(alarmMin);
+    alarmsec=HMtoSec(alarmHour, alarmMin);
+    Serial.print("alarmsec");
+    Serial.println(alarmsec);
     break;
     case 4:
     tft.setCursor(BORDER+36, STATUSBAR+BORDER+10);
@@ -408,6 +430,9 @@ void reDrawInput(int optRe){
     tft.print(":");
     tft.setCursor((BORDER*2+MENUW*2)/2+46, STATUSBAR+BORDER+10);
     printDigits(shutMin);
+    shutoffsec=HMtoSec(shutHour, shutMin);
+    Serial.print("shutoffsec");
+    Serial.println(shutoffsec);
     break;
     default:
     break;
