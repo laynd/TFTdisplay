@@ -1,5 +1,5 @@
 /*
-Water pump controller V 1.20
+Water pump controller V 1.21
 Built upon Adafruit TFT library examples
 Daniel Lameka 2/12/2016
 
@@ -101,7 +101,7 @@ int currentHour=0;
 int currentMinute=0;
 int pastMinute=0;
 int x,y, setHour, setMin, alarmHour, alarmMin, shutHour, shutMin, statCount, stateSensor;
-int sensorTriggerMin, sensorTriggerHour, statTH, statTM;
+int sensorTriggerMin, sensorTriggerHour, statTH, statTM, PSDown;
 long timePassedONtrigger, alarmsec, shutoffsec, dataread; 
 bool state, firstTimeTrigger;
 String datareadST;
@@ -144,11 +144,12 @@ void setup(void) {
   firstTimeTrigger=true;
   sensorTriggerMin=-1;
   sensorTriggerHour=-1;
-  timePassedONtrigger=0L;
+  timePassedONtrigger=0;
   statTH=0;
   statTM=0;
   alarmsec=3600L;
   shutoffsec=3600L;
+  PSDown=0;
   
 
   if (!SD.begin(SDPIN)) {
@@ -174,6 +175,7 @@ void setup(void) {
   
 
   // readinng data file 
+  /*
   WPFile = SD.open("wp.log");
   if (WPFile) {
     while (WPFile.available()) {
@@ -190,12 +192,12 @@ void setup(void) {
       }
       //
       
-      delay(50);
+      
     }
     WPFile.close();
   }
 
- 
+ */
   
   tft.reset();
   tft.begin(0x9341); // SDFP5408
@@ -212,7 +214,7 @@ void setup(void) {
   tft.println("Controller");
   tft.setCursor (90, 160);
   tft.setTextSize (2);
-  tft.println("V 1.16");
+  tft.println("V 1.21");
   tft.setCursor (75, 250);
   tft.setTextSize (1);
   
@@ -226,7 +228,7 @@ void setup(void) {
   pinMode(13, OUTPUT);
 }
 
-
+/*********************************************MAIN LOOP*****************************************/
 
 void loop()
 {
@@ -235,42 +237,78 @@ void loop()
   currentMinute=now.minute();
   setHour = currentHour;
   setMin = currentMinute;
-  
-  
-  
-  // sensor and button related processes
-  if ( sensor.isPressed() ){
-    delay(50);
-    if ( firstTimeTrigger ){
-    digitalWrite(SSRPIN, ON);
-    Serial.println("SSR ON");
-    alarm=RTC.now();
-    statTH=alarm.hour();
-    statTM=alarm.minute();
-
-    firstTimeTrigger = false;
-    }
-    if (currentMinute != pastMinute){
-    timePassedONtrigger=timePassed();
     
-    }
+  // sensor and button related processes
+  if ( PSDown == 0 ){
+    
+    if (currentMinute != pastMinute){
+        Serial.print("PSDown:");
+        Serial.println(PSDown);
+        }
+    
+    if ( sensor.isPressed() ){
+      delay(50);
+      if ( firstTimeTrigger ){
+        digitalWrite(SSRPIN, ON);
+        Serial.println("SSR ON");
+        alarm=RTC.now();
+        statTH=alarm.hour();
+        statTM=alarm.minute();
+        firstTimeTrigger = false;
+      }
+      if (currentMinute != pastMinute){
+        timePassedONtrigger=timePassed();
+        }
     
   }else {
     delay(50);
     if ( !firstTimeTrigger ){
-    digitalWrite(SSRPIN, OFF);
-    Serial.println("SSR OFF");
-    firstTimeTrigger = true;
+      digitalWrite(SSRPIN, OFF);
+      Serial.println("SSR OFF");
+      firstTimeTrigger = true;
+      alarm=RTC.now();
+      timePassedONtrigger=timePassed();
+      }
     }
   }
   
+  if (timePassedONtrigger > alarmsec) {
+    if (currentMinute != pastMinute){
+      Serial1.print("@");
+      Serial.println("ALARM");
+    }
+  }
   
+  if ( timePassedONtrigger > shutoffsec ){
+      PSDown=1;
+      if (currentMinute != pastMinute){
+      Serial.println("PumpShutDown triggered");
+      }  
+  }
+    
   
+  if (PSDown==1){
+    if (currentMinute != pastMinute){
+      digitalWrite(SSRPIN, OFF);
+      Serial.println("EMERGENCY SSR OFF");
+     }
+  }
   
+  if ( button.isPressed() ){
+    delay(50);
+    PSDown=0;
+    alarm=RTC.now();
+    timePassedONtrigger=timePassed();
+    Serial.println("SYSTEM RESET");
+  }
+    
+  
+  // updating time in status bar
   if (currentMinute != pastMinute){
     statusBar(currentHour, currentMinute, statTH, statTM);
     pastMinute = currentMinute;
-    
+    Serial.print("time passed on trigger:");
+    Serial.println(timePassedONtrigger);
   }
   
   
@@ -288,60 +326,22 @@ void loop()
     p.y = map(p.y, TS_MINY, TS_MAXY, 0, tft.height());
     x=p.x;
     y=p.y;
-    menuSelect = menuSelected(x, y);
+    menuSelect = menuSelected(x, y); // checking if menu buttons were pressed
     Serial1.print("&");
   }
+  
+  
+  
+  
+  // if menu selected go to loop "options"
   if ( menuSelect!=0 ){
     options(menuSelect);
   }
-  
-  
-
 }
 
+/*********************************************MAIN LOOP*****************************************/
 
-
-// utility functions
-
-
-int secTOmin(){
-}
-
-long HMtoSec(int ht, int mt){
-  long tyu=ht*3600L + mt*60L;
-  WPFile = SD.open("wp.log", FILE_WRITE);
-  
-  if (WPFile) {
-    WPFile.println(tyu, DEC);
-    WPFile.close();
-  }
-  return ht*3600L + mt*60L;
-  
-}
-
-
-long timePassed(){
-  long as = 0;
-  difference = now - alarm;
-  as = difference.totalseconds();
-  Serial.print("total seconds passed: ");
-  Serial.println(as);
-  return as;
-}
-
-
-TSPoint waitOneTouch() {
- // wait 1 touch to exit function
-  TSPoint p;
-  do {
-    p= ts.getPoint(); 
-    pinMode(XM, OUTPUT); //Pins configures again for TFT control
-    pinMode(YP, OUTPUT);
-  } while((p.z < MINPRESSURE )|| (p.z > MAXPRESSURE));
-  return p;
-}
-
-// loop function for selected option
+/******************************** loop function for selected option ***************************/
 void options (int opt){
   int x1 = 0;
   int y1 = 0;
@@ -395,6 +395,46 @@ void options (int opt){
   y=tft.width();
   menuSelect=0;
 }
+
+/******************************** loop function for selected option ***************************/
+
+// utility functions
+
+void writeToFile (long dataToStore){
+  WPFile = SD.open("wp.log", FILE_WRITE);
+  if (WPFile) {
+    WPFile.println(dataToStore, DEC);
+    WPFile.close();
+  }
+}
+  
+int secTOmin(){
+}
+
+long HMtoSec(int ht, int mt){return ht*3600L + mt*60L;}
+
+long timePassed(){
+  long as = 0;
+  difference = now - alarm;
+  as = difference.totalseconds();
+  Serial.print("total seconds passed: ");
+  Serial.println(as);
+  return as;
+}
+
+
+TSPoint waitOneTouch() {
+ // wait 1 touch to exit function
+  TSPoint p;
+  do {
+    p= ts.getPoint(); 
+    pinMode(XM, OUTPUT); //Pins configures again for TFT control
+    pinMode(YP, OUTPUT);
+  } while((p.z < MINPRESSURE )|| (p.z > MAXPRESSURE));
+  return p;
+}
+
+
 
 // redrawing input line when pressing on + - buttons in submenu
 void reDrawInput(int optRe){
