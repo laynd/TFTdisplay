@@ -129,14 +129,14 @@ void setup(void) {
   currentHour=now.hour();
   currentMinute=now.minute();
   pastMinute=currentMinute;
-  setHour = currentHour;
-  setMin = currentMinute;
+  
   
   delay(10);
-  
-  alarmHour = 0;
+  setHour = 0;
+  setMin = 0;
+  alarmHour = 1;
   alarmMin = 0;
-  shutHour = 0;
+  shutHour = 1;
   shutMin = 0;
   x = 0;
   y = 0;
