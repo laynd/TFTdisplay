@@ -1,14 +1,20 @@
 /*
-Water pump controller V 1.21
+Water pump controller V 1.23
 Built upon Adafruit TFT library examples
+
+Using Arduino Mega
+
 Daniel Lameka 2/12/2016
 
-speaker pin can only be changed in lib file
+Audio output is connected to slave arduino board communication via Serial1
 
+Using SD card to store settings and usage log
+
+pin 53 SD pin
 pin 39 dedicated to +5 of RTC module
 pin 41 dedicated to GND of RTC module
 
-pin - 24 button with 10K pull up 
+pin - 24 reset button with 10K pull up 
 pin 25 - sensor with 10K pull up
 
 pin 48 - SSR relay
@@ -27,6 +33,7 @@ pin 48 - SSR relay
 #include "SD.h"
 #include "Button.h"
 
+#define GALMIN 7.5  //gallons per hour need to adjust
 #define DS1307_ADDRESS 0x68
 #define BAUD 9600
 #define OFF LOW
@@ -101,15 +108,16 @@ int currentHour=0;
 int currentMinute=0;
 int pastMinute=0;
 int x,y, setHour, setMin, alarmHour, alarmMin, shutHour, shutMin, statCount, stateSensor;
-int sensorTriggerMin, sensorTriggerHour, statTH, statTM, PSDown;
-long timePassedONtrigger, alarmsec, shutoffsec, dataread; 
-bool state, firstTimeTrigger;
-String datareadST;
+int sensorTriggerMin, sensorTriggerHour, statTH, statTM, PSDown, str, timePassedForStat;
+long timePassedONtrigger, alarmsec, shutoffsec, dataread, settingsRead; 
+bool state, firstTimeTrigger, readSet;
+String datareadST, settingsReadST;
 
 DateTime now;
 DateTime alarm;
 TimeSpan difference;
 File WPFile;
+File SettingF;
 
 void setup(void) {
   Serial.begin(BAUD);
@@ -124,7 +132,7 @@ void setup(void) {
   
   RTC.begin(); 
   if (! RTC.isrunning()) {Serial.println("RTC is NOT running!");}
-  RTC.adjust(DateTime(__DATE__, __TIME__));
+  //RTC.adjust(DateTime(__DATE__, __TIME__));
   now = RTC.now();
   currentHour=now.hour();
   currentMinute=now.minute();
@@ -132,6 +140,7 @@ void setup(void) {
   
   
   delay(10);
+  timePassedForStat=0;
   setHour = 0;
   setMin = 0;
   alarmHour = 1;
@@ -150,11 +159,23 @@ void setup(void) {
   alarmsec=3600L;
   shutoffsec=3600L;
   PSDown=0;
+  readSet=true;
+  datareadST=""; 
+  settingsReadST="";
+  str=0;
   
 
   if (!SD.begin(SDPIN)) {
     Serial.println("Card failed, or not present");
   }
+  // file settings.set for storing settings on SD card and restoring in case of power down 
+  
+  // reading settings 
+  readSettings();
+  SettingF = SD.open("settings.set", FILE_WRITE);
+  SettingF.close();
+
+
   
   
   // open a new file and immediately close it:
@@ -214,7 +235,7 @@ void setup(void) {
   tft.println("Controller");
   tft.setCursor (90, 160);
   tft.setTextSize (2);
-  tft.println("V 1.21");
+  tft.println("V 1.23");
   tft.setCursor (75, 250);
   tft.setTextSize (1);
   
@@ -237,14 +258,21 @@ void loop()
   currentMinute=now.minute();
   setHour = currentHour;
   setMin = currentMinute;
+
+  if (currentHour == 0 && readSet){
+    readSettings();
+    readSet = false;
+  }
+  if (currentHour > 0){ readSet = true; } 
+  
     
   // sensor and button related processes
   if ( PSDown == 0 ){
     
-    if (currentMinute != pastMinute){
-        Serial.print("PSDown:");
-        Serial.println(PSDown);
-        }
+    //if (currentMinute != pastMinute){
+     //   Serial.print("PSDown:");
+      //  Serial.println(PSDown);
+     //   }
     
     if ( sensor.isPressed() ){
       delay(50);
@@ -258,6 +286,7 @@ void loop()
       }
       if (currentMinute != pastMinute){
         timePassedONtrigger=timePassed();
+        timePassedForStat=timePassedONtrigger;
         }
     
   }else {
@@ -400,6 +429,61 @@ void options (int opt){
 
 // utility functions
 
+void readSettings(){
+  if (SD.exists("settings.set")){ 
+    SettingF = SD.open("settings.set");
+    if (SettingF) {
+      while (SettingF.available()) {
+        settingsRead=SettingF.read();
+        if (isDigit(settingsRead)) {
+         settingsReadST += (char)settingsRead;
+        }
+      
+        if (settingsRead == '\n') {
+          str++;
+          settingsRead=settingsReadST.toInt();
+          Serial.println(settingsRead);
+          settingsReadST="";
+          switch (str){
+           case 1:
+              alarmHour=settingsRead;
+              break;
+           case 2:
+              alarmMin=settingsRead;
+              break;
+           case 3:
+              shutHour=settingsRead;
+              break;
+           case 4:
+              shutMin=settingsRead;
+              break;
+           default:
+              break;
+          }
+      }
+    }
+      WPFile.close();
+  }
+ }
+}
+
+void saveSettings(){
+  if (SD.exists("settings.set")) {
+    SD.remove("settings.set");
+  } else {
+    Serial.println("settings.set doesn't exist.");
+  }
+  delay(5);
+  SettingF = SD.open("settings.set", FILE_WRITE);
+  if (SettingF){
+    SettingF.println(alarmHour , DEC);
+    SettingF.println(alarmMin , DEC);
+    SettingF.println(shutHour , DEC);
+    SettingF.println(shutMin , DEC);
+    SettingF.close();
+  }
+}
+
 void writeToFile (long dataToStore){
   WPFile = SD.open("wp.log", FILE_WRITE);
   if (WPFile) {
@@ -408,7 +492,8 @@ void writeToFile (long dataToStore){
   }
 }
   
-int secTOmin(){
+int secTOmin(int sectomin){
+  return sectomin/60;
 }
 
 long HMtoSec(int ht, int mt){return ht*3600L + mt*60L;}
@@ -610,8 +695,9 @@ int buttonSelected (int xb, int yb, int optSel){
 }
 // back button returns TRUE or FALSE on press
 bool back (int xx, int yy){
-  if ( xx > BORDER && xx < BORDER*2+MENUW*2 && yy > tft.height()-BORDER-STATUSBAR && yy < tft.height()-BORDER) { 
-  return true; 
+  if ( xx > BORDER && xx < BORDER*2+MENUW*2 && yy > tft.height()-BORDER-STATUSBAR && yy < tft.height()-BORDER) {
+    saveSettings(); 
+    return true; 
 }
   else { return false; }
 }
@@ -694,8 +780,8 @@ void drawTime(int a, int b, int c, int d){
       lastTimeON+=d;
     }
     
-    int duration = 34;
-    int galUsed = 14;
+    int duration = secTOmin(timePassedForStat);
+    int galUsed = GALMIN*duration;
     
     tft.setTextSize (2);
     tft.setTextColor(GREEN);
