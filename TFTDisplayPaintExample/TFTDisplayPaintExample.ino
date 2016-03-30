@@ -96,6 +96,11 @@ TouchScreen ts = TouchScreen(XP, YP, XM, YM, 300);
 #define MENUH 125
 #define BORDER 10
 #define TBUTTON 75
+#define GRAPHB 53
+#define GRAPHS 13
+#define GRAPHMX 175
+#define GRAPHSI 14
+#define GRAPHBI 54
 
 Adafruit_TFTLCD tft(LCD_CS, LCD_CD, LCD_WR, LCD_RD, LCD_RESET);
 
@@ -267,16 +272,16 @@ void loop()
   
     
   // sensor and button related processes
-  if ( PSDown == 0 ){
+  if ( PSDown == 0 ){ // checking if timer didn't go over shut off mark if it did pump will be shut down until user reset
     
     //if (currentMinute != pastMinute){
      //   Serial.print("PSDown:");
       //  Serial.println(PSDown);
      //   }
-    
-    if ( sensor.isPressed() ){
+    // checking if sensor is activated
+    if ( sensor.isPressed() ){  
       delay(50);
-      if ( firstTimeTrigger ){
+      if ( firstTimeTrigger ){  // triggering turn on of SSR once, obtaining time stamp of event 
         digitalWrite(SSRPIN, ON);
         Serial.println("SSR ON");
         alarm=RTC.now();
@@ -284,14 +289,14 @@ void loop()
         statTM=alarm.minute();
         firstTimeTrigger = false;
       }
-      if (currentMinute != pastMinute){
-        timePassedONtrigger=timePassed();
-        timePassedForStat=timePassedONtrigger;
+      if (currentMinute != pastMinute){ 
+        timePassedONtrigger=timePassed(); //refreshing time passed on sensor trigger once per minute
+        timePassedForStat=timePassedONtrigger; //sending data to status bar
         }
     
   }else {
     delay(50);
-    if ( !firstTimeTrigger ){
+    if ( !firstTimeTrigger ){ 
       digitalWrite(SSRPIN, OFF);
       Serial.println("SSR OFF");
       firstTimeTrigger = true;
@@ -300,22 +305,21 @@ void loop()
       }
     }
   }
-  
-  if (timePassedONtrigger > alarmsec) {
+  //sending signal to secondary board to sound alarm
+  if (timePassedONtrigger > alarmsec) {  
     if (currentMinute != pastMinute){
       Serial1.print("@");
       Serial.println("ALARM");
     }
   }
-  
-  if ( timePassedONtrigger > shutoffsec ){
+  // triggering pump shot down until user reset
+  if ( timePassedONtrigger > shutoffsec ){ 
       PSDown=1;
       if (currentMinute != pastMinute){
       Serial.println("PumpShutDown triggered");
       }  
   }
-    
-  
+  // triggering pump shot down until user reset
   if (PSDown==1){
     if (currentMinute != pastMinute){
       digitalWrite(SSRPIN, OFF);
@@ -323,7 +327,8 @@ void loop()
      }
   }
   
-  if ( button.isPressed() ){
+  // reset on button press (might need to add screen interaction as well)
+  if ( button.isPressed() ){ 
     delay(50);
     PSDown=0;
     alarm=RTC.now();
@@ -429,6 +434,43 @@ void options (int opt){
 
 // utility functions
 
+void drawGraph(){
+  // GRAPHS 13 (graph start point from left), GRAPHB 53 (graph start point from bottom), GRAPHMX 175 (max height of graph)
+  // GRAPHSI 14, GRAPHBI 54
+  tft.drawFastHLine(GRAPHS, tft.height()-GRAPHB, tft.width()-GRAPHS*2, GREEN);
+  tft.drawFastVLine(GRAPHS, tft.height()-GRAPHB-GRAPHMX, GRAPHMX, GREEN);
+  tft.drawFastHLine(GRAPHS-3, tft.height()-GRAPHB-GRAPHMX, 3, GREEN);
+  tft.drawFastHLine(GRAPHS-3, tft.height()-GRAPHB-GRAPHMX/2, 3, GREEN);
+  tft.drawFastHLine(GRAPHS-3, tft.height()-GRAPHB-GRAPHMX/4-GRAPHMX/2, 3, GREEN);
+  tft.drawFastHLine(GRAPHS-3, tft.height()-GRAPHB+GRAPHMX/4-GRAPHMX/2, 3, GREEN);
+  tft.drawFastVLine(tft.width()-GRAPHS-1, tft.height()-GRAPHB-GRAPHMX, GRAPHMX, GREEN);
+  tft.drawFastHLine(tft.width()-GRAPHS, tft.height()-GRAPHB-GRAPHMX, 3, GREEN);
+  tft.drawFastHLine(tft.width()-GRAPHS, tft.height()-GRAPHB-GRAPHMX/2, 3, GREEN);
+  tft.drawFastHLine(tft.width()-GRAPHS, tft.height()-GRAPHB-GRAPHMX/4-GRAPHMX/2, 3, GREEN);
+  tft.drawFastHLine(tft.width()-GRAPHS, tft.height()-GRAPHB+GRAPHMX/4-GRAPHMX/2, 3, GREEN);
+  tft.setTextSize (1);
+  tft.setTextColor(CYAN);
+  tft.setCursor(GRAPHS+3, tft.height()-GRAPHB-GRAPHMX);
+  tft.print("500");
+  tft.setTextColor(YELLOW);
+  tft.setCursor(tft.width()-GRAPHS*2-7, tft.height()-GRAPHB-GRAPHMX);
+  tft.print("120");
+
+  //tft.drawFastHLine(GRAPHSI, tft.height()-GRAPHB-1, 212, WHITE);
+  for (int x=0; x <= 31; x++){
+    
+    tft.fillRect(GRAPHSI+x+3, tft.height()-GRAPHB-1-110, GRAPHSI+x+6, 110, CYAN);
+  }
+
+  
+  //tft.width()
+  //tft.height()
+  //tft.fillRect(x,y,x+i,y+i, color);
+  //tft.drawFastHLine(BORDER, tft.height()-BORDER, tft.width()-BORDER*2, GREEN);
+  //tft.drawFastVLine(x, 0, h, color2);
+  //tft.setTextColor(RED);    tft.setTextSize(3);
+}
+
 void readSettings(){
   if (SD.exists("settings.set")){ 
     SettingF = SD.open("settings.set");
@@ -438,7 +480,6 @@ void readSettings(){
         if (isDigit(settingsRead)) {
          settingsReadST += (char)settingsRead;
         }
-      
         if (settingsRead == '\n') {
           str++;
           settingsRead=settingsReadST.toInt();
@@ -460,9 +501,12 @@ void readSettings(){
            default:
               break;
           }
+          
       }
     }
       WPFile.close();
+      alarmsec=HMtoSec(alarmHour, alarmMin);
+      shutoffsec=HMtoSec(shutHour, shutMin);
   }
  }
 }
@@ -496,7 +540,9 @@ int secTOmin(int sectomin){
   return sectomin/60;
 }
 
-long HMtoSec(int ht, int mt){return ht*3600L + mt*60L;}
+long HMtoSec(int ht, int mt){
+  return ht*3600L + mt*60L;
+}
 
 long timePassed(){
   long as = 0;
@@ -574,7 +620,7 @@ void drawSubmenu (int optSub){
 
   switch (optSub){
     case 1:
-    
+    drawGraph();
 
     break;
     case 2:
