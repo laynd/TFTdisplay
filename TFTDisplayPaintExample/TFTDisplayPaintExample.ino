@@ -144,6 +144,8 @@ void setup(void) {
   pastMinute=currentMinute;
   
   
+  
+  
   delay(10);
   timePassedForStat=0;
   setHour = 0;
@@ -252,6 +254,7 @@ void setup(void) {
   statusBar(currentHour, currentMinute, 0, 0);
   drawMenu();
   pinMode(13, OUTPUT);
+  
 }
 
 /*********************************************MAIN LOOP*****************************************/
@@ -435,6 +438,9 @@ void options (int opt){
 // utility functions
 
 void drawGraph(){
+  int q1, q2;
+  q1=0;
+  q2=0;
   // GRAPHS 13 (graph start point from left), GRAPHB 53 (graph start point from bottom), GRAPHMX 175 (max height of graph)
   // GRAPHSI 14, GRAPHBI 54
   tft.drawFastHLine(GRAPHS, tft.height()-GRAPHB, tft.width()-GRAPHS*2, GREEN);
@@ -457,9 +463,20 @@ void drawGraph(){
   tft.print("120");
 
   //tft.drawFastHLine(GRAPHSI, tft.height()-GRAPHB-1, 212, WHITE);
-  for (int x=0; x <= 31; x++){
+  for (int x=15; x <= 190; x++){
+    q1++;
+    if(q1==6){
+    tft.fillRect(GRAPHSI+x-3, tft.height()-GRAPHB-1-x, 3, x, CYAN);
+    tft.fillRect(GRAPHSI+x, tft.height()-GRAPHB-1-x, 3, x, YELLOW);
+    q1=0;
+    q2++;
+    Serial.print(q2);
+    Serial.print(":");
+    Serial.print(GRAPHSI+x);
+    Serial.print(":");
+    Serial.println(GRAPHSI+x+3);
+    }
     
-    tft.fillRect(GRAPHSI+x+3, tft.height()-GRAPHB-1-110, GRAPHSI+x+6, 110, CYAN);
   }
 
   
